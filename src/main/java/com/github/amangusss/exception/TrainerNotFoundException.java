@@ -2,6 +2,6 @@ package com.github.amangusss.exception;
 
 public class TrainerNotFoundException extends BusinessException {
     public TrainerNotFoundException(String username) {
-        super(String.format("Trainer not found: " + username), "TRAINER_NOT_FOUND");
+        super(String.format("Trainer not found: %s", username), "TRAINER_NOT_FOUND");
     }
 }

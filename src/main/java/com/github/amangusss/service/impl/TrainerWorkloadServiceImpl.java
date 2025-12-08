@@ -28,6 +28,7 @@ public class TrainerWorkloadServiceImpl implements TrainerWorkloadService {
     TrainerWorkloadRepository repository;
     TrainerWorkloadMapper mapper;
 
+    @Override
     public void obtainWorkload(TrainerWorkloadDTO.Request.Create request, String transactionId) {
         YearMonth period = YearMonth.from(request.trainingDate());
 
@@ -37,6 +38,7 @@ public class TrainerWorkloadServiceImpl implements TrainerWorkloadService {
         }
     }
 
+    @Override
     @Transactional(readOnly = true)
     public TrainerWorkloadDTO.Response.Summary getTrainerSummary(String username, String transactionId) {
         List<TrainerWorkload> workloads = repository.findByUsername(username);

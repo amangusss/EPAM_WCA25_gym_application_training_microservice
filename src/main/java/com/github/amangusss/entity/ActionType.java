@@ -3,7 +3,7 @@ package com.github.amangusss.entity;
 import com.github.amangusss.converter.CodedEnum;
 import lombok.Getter;
 
-@Getter
+@Getter(onMethod_ = {@Override})
 public enum ActionType implements CodedEnum {
     ADD("add"),
     DELETE("delete");

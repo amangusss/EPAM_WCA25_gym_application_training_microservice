@@ -38,9 +38,9 @@ public class TrainerWorkloadController {
         log.info("[{}] POST /api/v1/workload | Request: username={}, action={}, date={}, duration={}",
                 transactionIdToUse,
                 request.username(),
-                request. actionType(),
+                request.actionType(),
                 request.trainingDate(),
-                request. trainingDuration());
+                request.trainingDuration());
 
         service.obtainWorkload(request, transactionIdToUse);
 

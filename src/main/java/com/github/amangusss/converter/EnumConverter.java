@@ -16,8 +16,8 @@ public final class EnumConverter {
         }
 
         return Arrays.stream(enumClass.getEnumConstants())
-                .filter(e -> e.getCode(). equalsIgnoreCase(code))
-                . findFirst()
+                .filter(e -> e.getCode().equalsIgnoreCase(code))
+                .findFirst()
                 .orElseThrow(() -> new UnsupportedCodeException(code, enumClass.getSimpleName())
                 );
     }

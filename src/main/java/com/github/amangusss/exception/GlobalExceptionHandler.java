@@ -47,9 +47,9 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleValidationError(MethodArgumentNotValidException e, WebRequest request) {
         String transactionId = getTransactionId(request);
 
-        String message = e.getBindingResult(). getFieldErrors(). stream()
-                . map(error -> error.getField() + ": " + error.getDefaultMessage())
-                . collect(Collectors. joining("; "));
+        String message = e.getBindingResult().getFieldErrors().stream()
+                .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                .collect(Collectors.joining("; "));
 
         log.error("[Transaction: {}] Validation error: {}", transactionId, message);
 
@@ -88,7 +88,7 @@ public class GlobalExceptionHandler {
 
     private String getTransactionId(WebRequest request) {
         String txId = request.getHeader("X-Transaction-Id");
-        return txId != null ?  txId : UUID. randomUUID().toString();
+        return txId != null ?  txId : UUID.randomUUID().toString();
     }
 
     private String getPath(WebRequest request) {
@@ -103,13 +103,13 @@ public class GlobalExceptionHandler {
         ErrorResponse response = ErrorResponse.builder()
                 .timestamp(Instant.now().toString())
                 .transactionId(txId)
-                .status(status. value())
-                . error(error)
+                .status(status.value())
+                .error(error)
                 .message(message)
                 .path(getPath(request))
                 .build();
 
-        return ResponseEntity.status(status). body(response);
+        return ResponseEntity.status(status).body(response);
     }
 
 }

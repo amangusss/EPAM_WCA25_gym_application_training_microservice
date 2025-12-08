@@ -19,7 +19,7 @@ public class CodedEnumSerializer<E extends Enum<E> & CodedEnum> extends JsonSeri
     public void serialize(E value, JsonGenerator gen, SerializerProvider provider)
             throws IOException {
         if (value == null) {
-            gen. writeNull();
+            gen.writeNull();
         } else {
             gen.writeString(value.getCode());
         }
