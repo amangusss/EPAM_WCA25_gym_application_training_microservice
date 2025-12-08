@@ -201,7 +201,7 @@ class TrainerWorkloadControllerTest {
                     .andExpect(jsonPath("$.lastName").value(LAST_NAME))
                     .andExpect(jsonPath("$.status").value("ACTIVE"))
                     .andExpect(jsonPath("$.years[0].year").value(2025))
-                    .andExpect(jsonPath("$.years[0].months[0].month").value(1))
+                    .andExpect(jsonPath("$.years[0].months[0].month").value("JANUARY"))
                     .andExpect(jsonPath("$.years[0].months[0].trainingSummaryDuration").value(5.0));
 
             verify(service).getTrainerSummary(eq(USERNAME), anyString());
