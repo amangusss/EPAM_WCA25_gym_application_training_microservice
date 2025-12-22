@@ -30,7 +30,8 @@ public class WorkloadMessageListener {
         String effectiveTransactionId = (transactionId != null && !transactionId.isBlank())
                 ? transactionId
                 : "Non-Provided";
-        log.info("[{}] Received workload message: username = {}", effectiveTransactionId, request.username());
+        String username = request != null ? request.username() : "null";
+        log.info("[{}] Received workload message: username = {}", effectiveTransactionId, username);
 
         if (!isValidMessage(request)) {
             log.error("[{}] Invalid workload message: {}, sending to DLQ", effectiveTransactionId, request);
@@ -48,10 +49,6 @@ public class WorkloadMessageListener {
     }
 
     private boolean isValidMessage(TrainerWorkloadDTO.Request.Create request) {
-        if (request.username() != null && request.username().startsWith("DLQ_TEST_")) {
-            return false;
-        }
-
         return request != null
                 && request.username() != null && !request.username().isBlank()
                 && request.firstName() != null && !request.firstName().isBlank()
