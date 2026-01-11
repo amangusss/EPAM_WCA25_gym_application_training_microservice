@@ -2,10 +2,8 @@ package com.github.amangusss.entity;
 
 import com.fasterxml.jackson.annotation.JsonValue;
 import lombok.Getter;
-import lombok.RequiredArgsConstructor;
 
 @Getter
-@RequiredArgsConstructor
 public enum Month {
     JANUARY(1),
     FEBRUARY(2),
@@ -21,6 +19,10 @@ public enum Month {
     DECEMBER(12);
 
     private final int value;
+
+    Month(int value) {
+        this.value = value;
+    }
 
     @JsonValue
     public String toJson() {

@@ -1,60 +1,47 @@
 package com.github.amangusss.entity;
 
-import com.github.amangusss.converter.impl.TrainerStatusConverter;
-import com.github.amangusss.converter.impl.YearMonthConverter;
-import jakarta.persistence.Column;
-import jakarta.persistence.Convert;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
-
-import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
-import lombok.Getter;
+import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
-import lombok.ToString;
-import lombok.experimental.FieldDefaults;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.time.YearMonth;
 
-@Getter
-@Setter
-@Entity
+@Data
 @Builder
-@ToString
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "trainer_workloads",
-       uniqueConstraints = @UniqueConstraint(columnNames = {"username", "period"}))
-@FieldDefaults(level = AccessLevel.PRIVATE)
+@Document(collection = "trainer_workloads")
+@CompoundIndex(name = "username_period_idx", def = "{'username': 1, 'period': 1}", unique = true)
+@CompoundIndex(name = "name_idx", def = "{'firstName': 1, 'lastName': 1}")
 public class TrainerWorkload {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    Long id;
+    private String id;
 
-    @Column(name = "username", nullable = false)
-    String username;
+    @Indexed
+    @Field("username")
+    private String username;
 
-    @Column(name = "first_name")
-    String firstName;
+    @Field("firstName")
+    private String firstName;
 
-    @Column(name = "last_name")
-    String lastName;
+    @Field("lastName")
+    private String lastName;
 
-    @Convert(converter = TrainerStatusConverter.class)
-    TrainerStatus status;
-
-    @Convert(converter = YearMonthConverter.class)
-    @Column(name = "period", length = 7)
-    YearMonth period;
+    @Field("period")
+    private YearMonth period;
 
     @Builder.Default
-    @Column(name = "total_hours")
-    Double totalHours = 0.0;
+    @Field("totalHours")
+    private Double totalHours = 0.0;
+
+    @Builder.Default
+    @Field("status")
+    private TrainerStatus status = TrainerStatus.ACTIVE;
 }
