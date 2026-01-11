@@ -13,8 +13,4 @@ public record ErrorResponse(
     String path,
     String timestamp,
     int status
-) {
-    public ErrorResponse(String transactionId, String error, String message, String path, String timestamp, HttpStatus status) {
-        this(transactionId, error, message, path, timestamp, status.value());
-    }
-}
+) {}

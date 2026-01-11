@@ -1,5 +1,8 @@
 package com.github.amangusss.dto.trainerWorkload;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.github.amangusss.converter.jackson.TrainerStatusDeserializer;
 import com.github.amangusss.entity.ActionType;
 import com.github.amangusss.entity.Month;
 import com.github.amangusss.entity.TrainerStatus;
@@ -21,6 +24,8 @@ public class TrainerWorkloadDTO {
                 @NotBlank String username,
                 @NotBlank String firstName,
                 @NotBlank String lastName,
+                @JsonProperty("isActive")
+                @JsonDeserialize(using = TrainerStatusDeserializer.class)
                 @NotNull TrainerStatus status,
                 @NotNull LocalDate trainingDate,
                 @NotNull @Positive Double trainingDuration,
