@@ -1,0 +1,207 @@
+openapi: 3.0.3
+info:
+  title: Trainer Workload API
+  version: 1.0.0
+  description: MongoDB-based trainer workload tracking service
+  contact:
+    name: Aman Nazarkulov
+    email: aman_nazarkulov@epam.com
+
+servers:
+  - url: http://localhost:8081/api/v1
+    description: Local development server
+
+paths:
+  /workload:
+    post:
+      operationId: processTrainingEvent
+      x-spring-method-name: processTrainingEvent
+      summary: Process training event
+      description: Add or delete training hours for a trainer
+      tags:
+        - Trainer Workload
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrainingEventRequest'
+      responses:
+        '200':
+          description: Training event processed successfully
+        '400':
+          description: Invalid request data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /workload/{username}:
+    get:
+      operationId: getTrainerSummary
+      x-spring-method-name: getTrainerSummary
+      summary: Get trainer workload summary
+      description: Retrieve trainer's training hours summary by username
+      tags:
+        - Trainer Workload
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: username
+          in: path
+          required: true
+          description: Trainer's username
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Trainer summary retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainerSummaryResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Trainer not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    TrainingEventRequest:
+      type: object
+      required:
+        - username
+        - firstName
+        - lastName
+        - status
+        - trainingDate
+        - trainingDuration
+        - actionType
+      properties:
+        username:
+          type: string
+          minLength: 1
+          description: Trainer's unique username
+        firstName:
+          type: string
+          minLength: 1
+          description: Trainer's first name
+        lastName:
+          type: string
+          minLength: 1
+          description: Trainer's last name
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+          description: Trainer's status
+        trainingDate:
+          type: string
+          format: date
+          description: Date of the training session
+        trainingDuration:
+          type: number
+          format: double
+          minimum: 0.1
+          description: Duration of training in hours
+        actionType:
+          type: string
+          enum: [ADD, DELETE]
+          description: Type of action to perform
+
+    TrainerSummaryResponse:
+      type: object
+      properties:
+        username:
+          type: string
+          description: Trainer's unique username
+        firstName:
+          type: string
+          description: Trainer's first name
+        lastName:
+          type: string
+          description: Trainer's last name
+        status:
+          type: string
+          enum: [ACTIVE, INACTIVE]
+          description: Trainer's current status
+        years:
+          type: array
+          description: List of years with training summaries
+          items:
+            $ref: '#/components/schemas/YearSummary'
+
+    YearSummary:
+      type: object
+      properties:
+        year:
+          type: integer
+          description: Year of the training summaries
+        months:
+          type: array
+          description: List of months with training summaries
+          items:
+            $ref: '#/components/schemas/MonthSummary'
+
+    MonthSummary:
+      type: object
+      properties:
+        month:
+          type: string
+          enum: [JANUARY, FEBRUARY, MARCH, APRIL, MAY, JUNE, JULY, AUGUST, SEPTEMBER, OCTOBER, NOVEMBER, DECEMBER]
+          description: Month of the training summary
+        trainingSummaryDuration:
+          type: number
+          format: double
+          description: Total training duration in hours for this month
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error type or code
+        message:
+          type: string
+          description: Detailed error message
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp of the error
+        path:
+          type: string
+          description: Request path that caused the error
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for authentication
