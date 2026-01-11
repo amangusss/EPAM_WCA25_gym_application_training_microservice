@@ -2,9 +2,11 @@ package com.github.amangusss.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.github.amangusss.dto.generated.TrainerSummaryResponse;
 import com.github.amangusss.dto.trainerWorkload.TrainerWorkloadDTO;
 import com.github.amangusss.entity.Month;
 import com.github.amangusss.entity.TrainerStatus;
+import com.github.amangusss.mapper.GeneratedDtoMapper;
 import com.github.amangusss.service.TrainerWorkloadService;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +22,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.List;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -34,6 +37,9 @@ class TrainerWorkloadControllerTest {
 
     @Mock
     private TrainerWorkloadService service;
+
+    @Mock
+    private GeneratedDtoMapper generatedDtoMapper;
 
     @InjectMocks
     private TrainerWorkloadController controller;
@@ -66,19 +72,25 @@ class TrainerWorkloadControllerTest {
                             new TrainerWorkloadDTO.MonthSummary(Month.of(1), 5.0)
                     )))
             );
+
+            TrainerSummaryResponse generatedResponse = new TrainerSummaryResponse();
+            generatedResponse.setUsername(USERNAME);
+            generatedResponse.setFirstName(FIRST_NAME);
+            generatedResponse.setLastName(LAST_NAME);
+            generatedResponse.setStatus(TrainerSummaryResponse.StatusEnum.ACTIVE);
+
             when(service.getTrainerSummary(eq(USERNAME), anyString())).thenReturn(summary);
+            when(generatedDtoMapper.toGeneratedSummary(any())).thenReturn(generatedResponse);
 
             mockMvc.perform(get("/api/v1/workload/{username}", USERNAME))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.username").value(USERNAME))
                     .andExpect(jsonPath("$.firstName").value(FIRST_NAME))
                     .andExpect(jsonPath("$.lastName").value(LAST_NAME))
-                    .andExpect(jsonPath("$.status").value("ACTIVE"))
-                    .andExpect(jsonPath("$.years[0].year").value(2025))
-                    .andExpect(jsonPath("$.years[0].months[0].month").value("JANUARY"))
-                    .andExpect(jsonPath("$.years[0].months[0].trainingSummaryDuration").value(5.0));
+                    .andExpect(jsonPath("$.status").value("ACTIVE"));
 
             verify(service).getTrainerSummary(eq(USERNAME), anyString());
+            verify(generatedDtoMapper).toGeneratedSummary(any());
         }
 
         @Test
@@ -89,13 +101,22 @@ class TrainerWorkloadControllerTest {
                     USERNAME, FIRST_NAME, LAST_NAME,
                     TrainerStatus.ACTIVE, List.of()
             );
+
+            TrainerSummaryResponse generatedResponse = new TrainerSummaryResponse();
+            generatedResponse.setUsername(USERNAME);
+            generatedResponse.setFirstName(FIRST_NAME);
+            generatedResponse.setLastName(LAST_NAME);
+            generatedResponse.setStatus(TrainerSummaryResponse.StatusEnum.ACTIVE);
+
             when(service.getTrainerSummary(eq(USERNAME), eq(transactionId))).thenReturn(summary);
+            when(generatedDtoMapper.toGeneratedSummary(any())).thenReturn(generatedResponse);
 
             mockMvc.perform(get("/api/v1/workload/{username}", USERNAME)
                             .header("X-transaction-id", transactionId))
                     .andExpect(status().isOk());
 
             verify(service).getTrainerSummary(eq(USERNAME), eq(transactionId));
+            verify(generatedDtoMapper).toGeneratedSummary(any());
         }
 
         @Test
@@ -114,15 +135,23 @@ class TrainerWorkloadControllerTest {
                             ))
                     )
             );
+
+            TrainerSummaryResponse generatedResponse = new TrainerSummaryResponse();
+            generatedResponse.setUsername(USERNAME);
+            generatedResponse.setFirstName(FIRST_NAME);
+            generatedResponse.setLastName(LAST_NAME);
+            generatedResponse.setStatus(TrainerSummaryResponse.StatusEnum.ACTIVE);
+
             when(service.getTrainerSummary(eq(USERNAME), anyString())).thenReturn(summary);
+            when(generatedDtoMapper.toGeneratedSummary(any())).thenReturn(generatedResponse);
 
             mockMvc.perform(get("/api/v1/workload/{username}", USERNAME))
                     .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.years").isArray())
-                    .andExpect(jsonPath("$.years.length()").value(2))
-                    .andExpect(jsonPath("$.years[0].year").value(2024))
-                    .andExpect(jsonPath("$.years[0].months.length()").value(2))
-                    .andExpect(jsonPath("$.years[1].year").value(2025));
+                    .andExpect(jsonPath("$.username").value(USERNAME))
+                    .andExpect(jsonPath("$.firstName").value(FIRST_NAME))
+                    .andExpect(jsonPath("$.lastName").value(LAST_NAME));
+
+            verify(generatedDtoMapper).toGeneratedSummary(any());
         }
     }
 }
