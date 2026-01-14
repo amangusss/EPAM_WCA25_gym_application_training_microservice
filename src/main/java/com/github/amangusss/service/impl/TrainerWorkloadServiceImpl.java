@@ -1,9 +1,11 @@
 package com.github.amangusss.service.impl;
 
 import com.github.amangusss.dto.trainerWorkload.TrainerWorkloadDTO;
+import com.github.amangusss.entity.MonthSummary;
 import com.github.amangusss.entity.TrainerWorkload;
+import com.github.amangusss.entity.YearSummary;
+import com.github.amangusss.entity.Month;
 import com.github.amangusss.exception.TrainerNotFoundException;
-import com.github.amangusss.exception.WorkloadNotFoundException;
 import com.github.amangusss.mapper.TrainerWorkloadMapper;
 import com.github.amangusss.repository.TrainerWorkloadRepository;
 import com.github.amangusss.service.TrainerWorkloadService;
@@ -15,9 +17,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.YearMonth;
-import java.util.List;
-import java.util.Optional;
+import java.time.LocalDate;
+import java.util.ArrayList;
 
 @Slf4j
 @Service
@@ -34,13 +35,16 @@ public class TrainerWorkloadServiceImpl implements TrainerWorkloadService {
         log.info("[{}][Transaction] Processing training event for trainer: {}, action: {}",
                 transactionId, request.username(), request.actionType());
 
-        YearMonth period = YearMonth.from(request.trainingDate());
-        log.debug("[{}][Operation] Calculated period {} for training date {}",
-                transactionId, period, request.trainingDate());
+        LocalDate trainingDate = request.trainingDate();
+        int year = trainingDate.getYear();
+        Month month = Month.of(trainingDate.getMonthValue());
+
+        log.debug("[{}][Operation] Calculated year {} and month {} for training date {}",
+                transactionId, year, month, trainingDate);
 
         switch (request.actionType()) {
-            case ADD -> addTrainingHours(request, period, transactionId);
-            case DELETE -> deleteTrainingHours(request.username(), period, request.trainingDuration(), transactionId);
+            case ADD -> addTrainingHours(request, year, month, transactionId);
+            case DELETE -> deleteTrainingHours(request.username(), year, month, request.trainingDuration(), transactionId);
         }
 
         log.info("[{}][Transaction] Completed processing training event for trainer: {}",
@@ -52,94 +56,119 @@ public class TrainerWorkloadServiceImpl implements TrainerWorkloadService {
     public TrainerWorkloadDTO.Response.Summary getTrainerSummary(String username, String transactionId) {
         log.info("[{}][Transaction] Retrieving workload summary for trainer {}", transactionId, username);
 
-        List<TrainerWorkload> workloads = repository.findByUsername(username);
-        log.debug("[{}][Operation] Found {} workload records for trainer {}",
-                transactionId, workloads.size(), username);
+        TrainerWorkload workload = repository.findByUsername(username)
+                .orElseThrow(() -> {
+                    log.warn("[{}] Workload not found for trainer {}", transactionId, username);
+                    return new TrainerNotFoundException(username);
+                });
 
-        if (workloads.isEmpty()) {
-            log.warn("[{}] Workload not found for trainer {}", transactionId, username);
-            throw new TrainerNotFoundException(username);
-        }
+        log.debug("[{}][Operation] Found workload for trainer {}", transactionId, username);
 
-        TrainerWorkloadDTO.Response.Summary summary = mapper.toSummary(workloads);
+        TrainerWorkloadDTO.Response.Summary summary = mapper.toSummary(workload);
         log.info("[{}][Transaction] Successfully retrieved summary for trainer: {}", transactionId, username);
 
         return summary;
     }
 
-    private void addTrainingHours(TrainerWorkloadDTO.Request.Create request, YearMonth period, String transactionId) {
-        log.debug("[{}][Operation] Searching for existing workload: username={}, period={}",
-                transactionId, request.username(), period);
+    private void addTrainingHours(TrainerWorkloadDTO.Request.Create request, int year, Month month, String transactionId) {
+        log.debug("[{}][Operation] Searching for existing workload: username={}", transactionId, request.username());
 
-        Optional<TrainerWorkload> workloadOpt = repository.findByUsernameAndPeriod(request.username(), period);
+        TrainerWorkload workload = repository.findByUsername(request.username())
+                .orElseGet(() -> createNewWorkload(request, transactionId));
 
-        if (workloadOpt.isEmpty()) {
-            log.debug("[{}][Operation] Creating new workload for trainer: {}, period: {}",
-                    transactionId, request.username(), period);
-            createNewWorkload(request, period, transactionId);
-        } else {
-            log.debug("[{}][Operation] Updating existing workload for trainer: {}, period: {}",
-                    transactionId, request.username(), period);
-            updateExistingWorkload(workloadOpt.get(), request, transactionId);
-        }
-    }
+        mapper.updateWorkloadInfo(workload, request);
 
-    private void createNewWorkload(TrainerWorkloadDTO.Request.Create request, YearMonth period, String transactionId) {
-        TrainerWorkload workload = mapper.toEntity(request, period);
+        YearSummary yearSummary = findOrCreateYear(workload, year);
+        MonthSummary monthSummary = findOrCreateMonth(yearSummary, month);
 
-        log.debug("[{}][Operation] Saving new workload: username={}, period={}, totalHours={}",
-                transactionId, workload.getUsername(), workload.getPeriod(), workload.getTotalHours());
-
-        repository.save(workload);
-
-        log.info("[{}][Operation] Created new workload for trainer: {}, totalHours: {}",
-                transactionId, request.username(), workload.getTotalHours());
-    }
-
-    private void updateExistingWorkload(TrainerWorkload workload, TrainerWorkloadDTO.Request.Create request, String transactionId) {
-        double oldHours = workload.getTotalHours();
+        double oldHours = monthSummary.getTotalHours();
         double newHours = oldHours + request.trainingDuration();
+        monthSummary.setTotalHours(newHours);
 
-        log.debug("[{}][Operation] Updating trainer profile: firstName={}, lastName={}, status={}",
-                transactionId, request.firstName(), request.lastName(), request.status());
-
-        mapper.updateEntityFromRequest(workload, request);
-        workload.setTotalHours(newHours);
-
-        log.debug("[{}][Operation] Saving updated workload: totalHours: {} -> {}",
-                transactionId, oldHours, newHours);
-
+        log.debug("[{}][Operation] Saving updated workload: totalHours: {} -> {}", transactionId, oldHours, newHours);
         repository.save(workload);
 
-        log.info("[{}][Operation] Updated workload for trainer: {}, added {} hours, new total: {}",
-                transactionId, request.username(), request.trainingDuration(), newHours);
+        log.info("[{}][Operation] Added {} hours for trainer: {}, new total: {}",
+                transactionId, request.trainingDuration(), request.username(), newHours);
     }
 
-    private void deleteTrainingHours(String username, YearMonth period, Double trainingDuration, String transactionId) {
-        log.debug("[{}][Operation] Searching for workload to delete: username={}, period={}",
-                transactionId, username, period);
+    private TrainerWorkload createNewWorkload(TrainerWorkloadDTO.Request.Create request, String transactionId) {
+        log.debug("[{}][Operation] Creating new workload for trainer: {}", transactionId, request.username());
 
-        TrainerWorkload workload = repository
-                .findByUsernameAndPeriod(username, period)
+        return TrainerWorkload.builder()
+                .username(request.username())
+                .firstName(request.firstName())
+                .lastName(request.lastName())
+                .status(request.status())
+                .years(new ArrayList<>())
+                .build();
+    }
+
+    private YearSummary findOrCreateYear(TrainerWorkload workload, int year) {
+        return workload.getYears().stream()
+                .filter(y -> y.getYear().equals(year))
+                .findFirst()
+                .orElseGet(() -> {
+                    YearSummary newYear = YearSummary.builder()
+                            .year(year)
+                            .months(new ArrayList<>())
+                            .build();
+                    workload.getYears().add(newYear);
+                    return newYear;
+                });
+    }
+
+    private MonthSummary findOrCreateMonth(YearSummary yearSummary, Month month) {
+        return yearSummary.getMonths().stream()
+                .filter(m -> m.getMonth() == month)
+                .findFirst()
+                .orElseGet(() -> {
+                    MonthSummary newMonth = MonthSummary.builder()
+                            .month(month)
+                            .totalHours(0.0)
+                            .build();
+                    yearSummary.getMonths().add(newMonth);
+                    return newMonth;
+                });
+    }
+
+    private void deleteTrainingHours(String username, int year, Month month, Double trainingDuration, String transactionId) {
+        log.debug("[{}][Operation] Searching for workload to delete: username={}", transactionId, username);
+
+        TrainerWorkload workload = repository.findByUsername(username)
                 .orElseThrow(() -> {
-                    log.warn("[{}] Workload not found for trainer {} in period {} when trying to delete hours",
-                            transactionId, username, period);
-                    return new WorkloadNotFoundException(username, period);
+                    log.warn("[{}] Workload not found for trainer {} when trying to delete hours", transactionId, username);
+                    return new TrainerNotFoundException(username);
                 });
 
-        double oldHours = workload.getTotalHours();
+        YearSummary yearSummary = workload.getYears().stream()
+                .filter(y -> y.getYear().equals(year))
+                .findFirst()
+                .orElseThrow(() -> new TrainerNotFoundException(username));
+
+        MonthSummary monthSummary = yearSummary.getMonths().stream()
+                .filter(m -> m.getMonth() == month)
+                .findFirst()
+                .orElseThrow(() -> new TrainerNotFoundException(username));
+
+        double oldHours = monthSummary.getTotalHours();
         double newHours = oldHours - trainingDuration;
 
         if (newHours <= 0) {
-            log.debug("[{}][Operation] Deleting workload: totalHours became {} (≤ 0)", transactionId, newHours);
-            repository.delete(workload);
-            log.info("[{}][Operation] Deleted workload for trainer: {}, period: {}", transactionId, username, period);
+            log.debug("[{}][Operation] Removing month: totalHours became {} (≤ 0)", transactionId, newHours);
+            yearSummary.getMonths().remove(monthSummary);
+
+            if (yearSummary.getMonths().isEmpty()) {
+                log.debug("[{}][Operation] Removing year: no months left", transactionId);
+                workload.getYears().remove(yearSummary);
+            }
         } else {
-            workload.setTotalHours(newHours);
-            log.debug("[{}][Operation] Saving updated workload: totalHours: {} -> {}", transactionId, oldHours, newHours);
-            repository.save(workload);
-            log.info("[{}][Operation] Removed {} hours for trainer: {}, new total: {}",
-                    transactionId, trainingDuration, username, newHours);
+            monthSummary.setTotalHours(newHours);
         }
+
+        log.debug("[{}][Operation] Saving updated workload", transactionId);
+        repository.save(workload);
+
+        log.info("[{}][Operation] Removed {} hours for trainer: {}", transactionId, trainingDuration, username);
     }
 }

@@ -1,69 +1,54 @@
 package com.github.amangusss.mapper;
 
 import com.github.amangusss.dto.trainerWorkload.TrainerWorkloadDTO;
-import com.github.amangusss.entity.Month;
+import com.github.amangusss.entity.MonthSummary;
 import com.github.amangusss.entity.TrainerWorkload;
 
+import com.github.amangusss.entity.YearSummary;
 import org.springframework.stereotype.Component;
 
-import java.time.YearMonth;
 import java.util.Comparator;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Component
 public class TrainerWorkloadMapper {
 
-    public TrainerWorkload toEntity(TrainerWorkloadDTO.Request.Create request, YearMonth period) {
-        return TrainerWorkload.builder()
-                .username(request.username())
-                .firstName(request.firstName())
-                .lastName(request.lastName())
-                .status(request.status())
-                .period(period)
-                .totalHours(request.trainingDuration())
-                .build();
-    }
-
-    public TrainerWorkloadDTO.Response.Summary toSummary(List<TrainerWorkload> workloads) {
-        if (workloads == null || workloads.isEmpty()) {
+    public TrainerWorkloadDTO.Response.Summary toSummary(TrainerWorkload workload) {
+        if (workload == null) {
             return null;
         }
 
-        TrainerWorkload first = workloads.get(0);
-
-        List<TrainerWorkloadDTO.YearSummary> years = workloads.stream()
-                .collect(Collectors.groupingBy(
-                        w -> w.getPeriod().getYear(),
-                        Collectors.mapping(
-                                this::toMonthSummary,
-                                Collectors.toList()
-                        )
-                ))
-                .entrySet().stream()
-                .map(e -> new TrainerWorkloadDTO.YearSummary(e.getKey(), e.getValue()))
+        List<TrainerWorkloadDTO.YearSummary> years = workload.getYears().stream()
+                .map(this::toYearSummaryDto)
                 .sorted(Comparator.comparingInt(TrainerWorkloadDTO.YearSummary::year))
                 .toList();
 
         return new TrainerWorkloadDTO.Response.Summary(
-                first.getUsername(),
-                first.getFirstName(),
-                first.getLastName(),
-                first.getStatus(),
+                workload.getUsername(),
+                workload.getFirstName(),
+                workload.getLastName(),
+                workload.getStatus(),
                 years
         );
     }
 
-    public TrainerWorkloadDTO.MonthSummary toMonthSummary(TrainerWorkload workload) {
-        return new TrainerWorkloadDTO.MonthSummary(
-                Month.of(workload.getPeriod().getMonthValue()),
-                workload.getTotalHours()
-        );
-    }
-
-    public void updateEntityFromRequest(TrainerWorkload workload, TrainerWorkloadDTO.Request.Create request) {
+    public void updateWorkloadInfo(TrainerWorkload workload, TrainerWorkloadDTO.Request.Create request) {
         workload.setFirstName(request.firstName());
         workload.setLastName(request.lastName());
         workload.setStatus(request.status());
+    }
+
+    private TrainerWorkloadDTO.YearSummary toYearSummaryDto(YearSummary yearSummary) {
+        List<TrainerWorkloadDTO.MonthSummary> months = yearSummary.getMonths().stream()
+                .map(this::toMonthSummaryDto)
+                .toList();
+        return new TrainerWorkloadDTO.YearSummary(yearSummary.getYear(), months);
+    }
+
+    private TrainerWorkloadDTO.MonthSummary toMonthSummaryDto(MonthSummary monthSummary) {
+        return new TrainerWorkloadDTO.MonthSummary(
+                monthSummary.getMonth(),
+                monthSummary.getTotalHours()
+        );
     }
 }
