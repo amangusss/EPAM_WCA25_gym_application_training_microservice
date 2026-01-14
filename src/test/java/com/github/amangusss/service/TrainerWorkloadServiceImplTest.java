@@ -1,12 +1,13 @@
 package com.github.amangusss.service;
 
 import com.github.amangusss.dto.trainerWorkload.TrainerWorkloadDTO;
-import com.github.amangusss.entity.ActionType;
+import com.github.amangusss.entity.TrainerWorkload;
+import com.github.amangusss.entity.MonthSummary;
+import com.github.amangusss.entity.YearSummary;
 import com.github.amangusss.entity.Month;
 import com.github.amangusss.entity.TrainerStatus;
-import com.github.amangusss.entity.TrainerWorkload;
+import com.github.amangusss.entity.ActionType;
 import com.github.amangusss.exception.TrainerNotFoundException;
-import com.github.amangusss.exception.WorkloadNotFoundException;
 import com.github.amangusss.mapper.TrainerWorkloadMapper;
 import com.github.amangusss.repository.TrainerWorkloadRepository;
 import com.github.amangusss.service.impl.TrainerWorkloadServiceImpl;
@@ -22,14 +23,14 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDate;
-import java.time.YearMonth;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -55,7 +56,6 @@ class TrainerWorkloadServiceImplTest {
     private static final String FIRST_NAME = "John";
     private static final String LAST_NAME = "Doe";
     private static final LocalDate TRAINING_DATE = LocalDate.of(2025, 1, 15);
-    private static final YearMonth PERIOD = YearMonth.of(2025, 1);
     private static final Double DURATION = 2.5;
 
     private TrainerWorkloadDTO.Request.Create createAddRequest() {
@@ -74,15 +74,24 @@ class TrainerWorkloadServiceImplTest {
         );
     }
 
-    private TrainerWorkload createWorkload(Double totalHours) {
+    private TrainerWorkload createWorkloadWithHours(Double totalHours) {
+        MonthSummary monthSummary = MonthSummary.builder()
+                .month(Month.JANUARY)
+                .totalHours(totalHours)
+                .build();
+
+        YearSummary yearSummary = YearSummary.builder()
+                .year(2025)
+                .months(new ArrayList<>(List.of(monthSummary)))
+                .build();
+
         return TrainerWorkload.builder()
-                .id("test-id-" + totalHours)
+                .id("test-id")
                 .username(USERNAME)
                 .firstName(FIRST_NAME)
                 .lastName(LAST_NAME)
                 .status(TrainerStatus.ACTIVE)
-                .period(PERIOD)
-                .totalHours(totalHours)
+                .years(new ArrayList<>(List.of(yearSummary)))
                 .build();
     }
 
@@ -94,50 +103,52 @@ class TrainerWorkloadServiceImplTest {
         @DisplayName("Should create new workload when no existing record")
         void shouldCreateNewWorkloadWhenNoExistingRecord() {
             var request = createAddRequest();
-            var newWorkload = createWorkload(DURATION);
 
-            when(repository.findByUsernameAndPeriod(USERNAME, PERIOD)).thenReturn(Optional.empty());
-            when(mapper.toEntity(request, PERIOD)).thenReturn(newWorkload);
-            when(repository.save(any(TrainerWorkload.class))).thenReturn(newWorkload);
+            when(repository.findByUsername(USERNAME)).thenReturn(Optional.empty());
+            when(repository.save(any(TrainerWorkload.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
             service.obtainWorkload(request, TRANSACTION_ID);
 
             verify(repository).save(workloadCaptor.capture());
-            assertThat(workloadCaptor.getValue().getTotalHours()).isEqualTo(DURATION);
-            verify(mapper).toEntity(request, PERIOD);
-            verify(mapper, never()).updateEntityFromRequest(any(), any());
+            TrainerWorkload saved = workloadCaptor.getValue();
+            assertThat(saved.getUsername()).isEqualTo(USERNAME);
+            assertThat(saved.getYears()).hasSize(1);
+            assertThat(saved.getYears().get(0).getMonths()).hasSize(1);
+            assertThat(saved.getYears().get(0).getMonths().get(0).getTotalHours()).isEqualTo(DURATION);
         }
 
         @Test
         @DisplayName("Should add hours to existing workload")
         void shouldAddHoursToExistingWorkload() {
             var request = createAddRequest();
-            var existingWorkload = createWorkload(5.0);
+            var existingWorkload = createWorkloadWithHours(5.0);
 
-            when(repository.findByUsernameAndPeriod(USERNAME, PERIOD)).thenReturn(Optional.of(existingWorkload));
-            when(repository.save(any(TrainerWorkload.class))).thenReturn(existingWorkload);
+            when(repository.findByUsername(USERNAME)).thenReturn(Optional.of(existingWorkload));
+            doNothing().when(mapper).updateWorkloadInfo(any(), any());
+            when(repository.save(any(TrainerWorkload.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
             service.obtainWorkload(request, TRANSACTION_ID);
 
             verify(repository).save(workloadCaptor.capture());
-            assertThat(workloadCaptor.getValue().getTotalHours()).isEqualTo(7.5); // 5.0 + 2.5
-            verify(mapper).updateEntityFromRequest(existingWorkload, request);
-            verify(mapper, never()).toEntity(any(), any());
+            TrainerWorkload saved = workloadCaptor.getValue();
+            assertThat(saved.getYears().get(0).getMonths().get(0).getTotalHours()).isEqualTo(7.5); // 5.0 + 2.5
         }
 
         @Test
         @DisplayName("Should accumulate multiple trainings in same month")
         void shouldAccumulateMultipleTrainingsInSameMonth() {
             var request = createAddRequest();
-            var existingWorkload = createWorkload(10.0);
+            var existingWorkload = createWorkloadWithHours(10.0);
 
-            when(repository.findByUsernameAndPeriod(USERNAME, PERIOD)).thenReturn(Optional.of(existingWorkload));
-            when(repository.save(any(TrainerWorkload.class))).thenReturn(existingWorkload);
+            when(repository.findByUsername(USERNAME)).thenReturn(Optional.of(existingWorkload));
+            doNothing().when(mapper).updateWorkloadInfo(any(), any());
+            when(repository.save(any(TrainerWorkload.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
             service.obtainWorkload(request, TRANSACTION_ID);
 
             verify(repository).save(workloadCaptor.capture());
-            assertThat(workloadCaptor.getValue().getTotalHours()).isEqualTo(12.5); // 10.0 + 2.5
+            TrainerWorkload saved = workloadCaptor.getValue();
+            assertThat(saved.getYears().get(0).getMonths().get(0).getTotalHours()).isEqualTo(12.5); // 10.0 + 2.5
         }
     }
 
@@ -149,44 +160,55 @@ class TrainerWorkloadServiceImplTest {
         @DisplayName("Should subtract hours from existing workload")
         void shouldSubtractHoursFromExistingWorkload() {
             var request = createDeleteRequest();
-            var existingWorkload = createWorkload(5.0);
+            var existingWorkload = createWorkloadWithHours(5.0);
 
-            when(repository.findByUsernameAndPeriod(USERNAME, PERIOD)).thenReturn(Optional.of(existingWorkload));
-            when(repository.save(any(TrainerWorkload.class))).thenReturn(existingWorkload);
+            when(repository.findByUsername(USERNAME)).thenReturn(Optional.of(existingWorkload));
+            when(repository.save(any(TrainerWorkload.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
             service.obtainWorkload(request, TRANSACTION_ID);
 
             verify(repository).save(workloadCaptor.capture());
-            assertThat(workloadCaptor.getValue().getTotalHours()).isEqualTo(2.5); // 5.0 - 2.5
-            verify(repository, never()).delete(any());
+            TrainerWorkload saved = workloadCaptor.getValue();
+            assertThat(saved.getYears().get(0).getMonths().get(0).getTotalHours()).isEqualTo(2.5); // 5.0 - 2.5
         }
 
         @Test
-        @DisplayName("Should delete workload when hours become zero")
-        void shouldDeleteWorkloadWhenHoursBecomeZero() {
+        @DisplayName("Should delete month when hours become zero")
+        void shouldDeleteMonthWhenHoursBecomeZero() {
             var request = createDeleteRequest();
-            var existingWorkload = createWorkload(2.5);
+            var existingWorkload = createWorkloadWithHours(2.5);
 
-            when(repository.findByUsernameAndPeriod(USERNAME, PERIOD)).thenReturn(Optional.of(existingWorkload));
+            when(repository.findByUsername(USERNAME)).thenReturn(Optional.of(existingWorkload));
+            when(repository.save(any(TrainerWorkload.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
             service.obtainWorkload(request, TRANSACTION_ID);
 
-            verify(repository).delete(existingWorkload);
-            verify(repository, never()).save(any());
+            verify(repository).save(workloadCaptor.capture());
+            TrainerWorkload saved = workloadCaptor.getValue();
+            assertThat(saved.getYears()).satisfiesAnyOf(
+                    years -> assertThat(years).isEmpty(),
+                    years -> assertThat(years.get(0).getMonths()).isEmpty()
+            );
         }
 
         @Test
-        @DisplayName("Should delete workload when hours become negative")
-        void shouldDeleteWorkloadWhenHoursBecomeNegative() {
+        @DisplayName("Should delete month when hours become negative")
+        void shouldDeleteMonthWhenHoursBecomeNegative() {
             var request = createDeleteRequest();
-            var existingWorkload = createWorkload(1.0);
+            var existingWorkload = createWorkloadWithHours(1.0);
 
-            when(repository.findByUsernameAndPeriod(USERNAME, PERIOD)).thenReturn(Optional.of(existingWorkload));
+            when(repository.findByUsername(USERNAME)).thenReturn(Optional.of(existingWorkload));
+            when(repository.save(any(TrainerWorkload.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
             service.obtainWorkload(request, TRANSACTION_ID);
 
-            verify(repository).delete(existingWorkload);
-            verify(repository, never()).save(any());
+            verify(repository).save(workloadCaptor.capture());
+            TrainerWorkload saved = workloadCaptor.getValue();
+            // Проверяем что список годов пустой или первый год не имеет месяцев
+            assertThat(saved.getYears()).satisfiesAnyOf(
+                    years -> assertThat(years).isEmpty(),
+                    years -> assertThat(years.get(0).getMonths()).isEmpty()
+            );
         }
 
         @Test
@@ -194,12 +216,11 @@ class TrainerWorkloadServiceImplTest {
         void shouldThrowExceptionWhenWorkloadNotFoundForDelete() {
             var request = createDeleteRequest();
 
-            when(repository.findByUsernameAndPeriod(USERNAME, PERIOD)).thenReturn(Optional.empty());
+            when(repository.findByUsername(USERNAME)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.obtainWorkload(request, TRANSACTION_ID))
-                    .isInstanceOf(WorkloadNotFoundException.class);
+                    .isInstanceOf(TrainerNotFoundException.class);
 
-            verify(repository, never()).delete(any());
             verify(repository, never()).save(any());
         }
     }
@@ -211,41 +232,30 @@ class TrainerWorkloadServiceImplTest {
         @Test
         @DisplayName("Should return trainer summary")
         void shouldReturnTrainerSummary() {
-            var workloads = List.of(
-                    createWorkload(5.0),
-                    TrainerWorkload.builder()
-                            .username(USERNAME)
-                            .firstName(FIRST_NAME)
-                            .lastName(LAST_NAME)
-                            .status(TrainerStatus.ACTIVE)
-                            .period(YearMonth.of(2025, 2))
-                            .totalHours(3.0)
-                            .build()
-            );
+            var workload = createWorkloadWithHours(5.0);
 
             var expectedSummary = new TrainerWorkloadDTO.Response.Summary(
                     USERNAME, FIRST_NAME, LAST_NAME,
                     TrainerStatus.ACTIVE,
                     List.of(new TrainerWorkloadDTO.YearSummary(2025, List.of(
-                            new TrainerWorkloadDTO.MonthSummary(Month.of(1), 5.0),
-                            new TrainerWorkloadDTO.MonthSummary(Month.of(2), 3.0)
+                            new TrainerWorkloadDTO.MonthSummary(Month.JANUARY, 5.0)
                     )))
             );
 
-            when(repository.findByUsername(USERNAME)).thenReturn(workloads);
-            when(mapper.toSummary(workloads)).thenReturn(expectedSummary);
+            when(repository.findByUsername(USERNAME)).thenReturn(Optional.of(workload));
+            when(mapper.toSummary(workload)).thenReturn(expectedSummary);
 
             var result = service.getTrainerSummary(USERNAME, TRANSACTION_ID);
 
             assertThat(result).isEqualTo(expectedSummary);
             verify(repository).findByUsername(USERNAME);
-            verify(mapper).toSummary(workloads);
+            verify(mapper).toSummary(workload);
         }
 
         @Test
         @DisplayName("Should throw exception when trainer not found")
         void shouldThrowExceptionWhenTrainerNotFound() {
-            when(repository.findByUsername(USERNAME)).thenReturn(Collections.emptyList());
+            when(repository.findByUsername(USERNAME)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> service.getTrainerSummary(USERNAME, TRANSACTION_ID))
                     .isInstanceOf(TrainerNotFoundException.class);
