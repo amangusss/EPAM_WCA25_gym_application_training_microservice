@@ -100,14 +100,14 @@ public class GlobalExceptionHandler {
                                                         String message,
                                                         String txId,
                                                         WebRequest request) {
-        ErrorResponse response = ErrorResponse.builder()
-                .timestamp(Instant.now().toString())
-                .transactionId(txId)
-                .status(status.value())
-                .error(error)
-                .message(message)
-                .path(getPath(request))
-                .build();
+        ErrorResponse response = new ErrorResponse(
+                txId,
+                error,
+                message,
+                getPath(request),
+                Instant.now().toString(),
+                status.value()
+        );
 
         return ResponseEntity.status(status).body(response);
     }

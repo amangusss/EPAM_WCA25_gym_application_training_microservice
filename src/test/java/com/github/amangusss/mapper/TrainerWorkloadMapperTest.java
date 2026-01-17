@@ -45,7 +45,7 @@ class TrainerWorkloadMapperTest {
 
     private TrainerWorkload createWorkload(YearMonth period, Double totalHours) {
         return TrainerWorkload.builder()
-                .id(1L)
+                .id("test-id-" + totalHours)
                 .username(USERNAME)
                 .firstName(FIRST_NAME)
                 .lastName(LAST_NAME)

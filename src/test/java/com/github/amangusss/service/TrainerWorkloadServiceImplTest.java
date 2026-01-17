@@ -76,7 +76,7 @@ class TrainerWorkloadServiceImplTest {
 
     private TrainerWorkload createWorkload(Double totalHours) {
         return TrainerWorkload.builder()
-                .id(1L)
+                .id("test-id-" + totalHours)
                 .username(USERNAME)
                 .firstName(FIRST_NAME)
                 .lastName(LAST_NAME)
@@ -96,7 +96,6 @@ class TrainerWorkloadServiceImplTest {
             var request = createAddRequest();
             var newWorkload = createWorkload(DURATION);
 
-            when(repository.existsByUsernameAndPeriod(USERNAME, PERIOD)).thenReturn(false);
             when(repository.findByUsernameAndPeriod(USERNAME, PERIOD)).thenReturn(Optional.empty());
             when(mapper.toEntity(request, PERIOD)).thenReturn(newWorkload);
             when(repository.save(any(TrainerWorkload.class))).thenReturn(newWorkload);
@@ -115,7 +114,6 @@ class TrainerWorkloadServiceImplTest {
             var request = createAddRequest();
             var existingWorkload = createWorkload(5.0);
 
-            when(repository.existsByUsernameAndPeriod(USERNAME, PERIOD)).thenReturn(true);
             when(repository.findByUsernameAndPeriod(USERNAME, PERIOD)).thenReturn(Optional.of(existingWorkload));
             when(repository.save(any(TrainerWorkload.class))).thenReturn(existingWorkload);
 
@@ -133,7 +131,6 @@ class TrainerWorkloadServiceImplTest {
             var request = createAddRequest();
             var existingWorkload = createWorkload(10.0);
 
-            when(repository.existsByUsernameAndPeriod(USERNAME, PERIOD)).thenReturn(true);
             when(repository.findByUsernameAndPeriod(USERNAME, PERIOD)).thenReturn(Optional.of(existingWorkload));
             when(repository.save(any(TrainerWorkload.class))).thenReturn(existingWorkload);
 

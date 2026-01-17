@@ -1,13 +1,11 @@
 package com.github.amangusss.dto.trainerWorkload;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
-import com.github.amangusss.converter.jackson.TrainerStatusDeserializer;
 import com.github.amangusss.entity.ActionType;
 import com.github.amangusss.entity.Month;
 import com.github.amangusss.entity.TrainerStatus;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Positive;
 
 import java.time.LocalDate;
@@ -21,15 +19,28 @@ public class TrainerWorkloadDTO {
 
     public static class Request {
         public record Create(
-                @NotBlank String username,
-                @NotBlank String firstName,
-                @NotBlank String lastName,
-                @JsonProperty("isActive")
-                @JsonDeserialize(using = TrainerStatusDeserializer.class)
-                @NotNull TrainerStatus status,
-                @NotNull LocalDate trainingDate,
-                @NotNull @Positive Double trainingDuration,
-                @NotNull ActionType actionType
+                @NotBlank(message = "Username is required")
+                String username,
+
+                @NotBlank(message = "First name is required")
+                String firstName,
+
+                @NotBlank(message = "Last name is required")
+                String lastName,
+
+                @NotNull(message = "Trainer status is required")
+                TrainerStatus status,
+
+                @NotNull(message = "Training date is required")
+                @PastOrPresent(message = "Training date cannot be in the future")
+                LocalDate trainingDate,
+
+                @NotNull(message = "Training duration is required")
+                @Positive(message = "Training duration must be positive")
+                Double trainingDuration,
+
+                @NotNull(message = "Action type is required")
+                ActionType actionType
                 ) {}
     }
 

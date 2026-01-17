@@ -1,4 +1,4 @@
-package com.github.amangusss.jms;
+package com.github.amangusss.jms.listener;
 
 import com.github.amangusss.dto.trainerWorkload.TrainerWorkloadDTO;
 import com.github.amangusss.service.TrainerWorkloadService;

@@ -3,6 +3,7 @@ package com.github.amangusss.jms;
 import com.github.amangusss.dto.trainerWorkload.TrainerWorkloadDTO;
 import com.github.amangusss.entity.ActionType;
 import com.github.amangusss.entity.TrainerStatus;
+import com.github.amangusss.jms.listener.WorkloadMessageListener;
 import com.github.amangusss.service.TrainerWorkloadService;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -155,7 +156,7 @@ class WorkloadMessageListenerTest {
         void shouldSendToDlqWhenRequestIsNull() {
             listener.receiveMessage(null, TRANSACTION_ID);
 
-            verify(jmsTemplate).convertAndSend(eq(DLQ_QUEUE), (TrainerWorkloadDTO.Request.Create) isNull(), any(MessagePostProcessor.class));
+            verify(jmsTemplate).convertAndSend(eq(DLQ_QUEUE), isNull(), any(MessagePostProcessor.class));
             verify(trainerWorkloadService, never()).obtainWorkload(any(), anyString());
         }
 

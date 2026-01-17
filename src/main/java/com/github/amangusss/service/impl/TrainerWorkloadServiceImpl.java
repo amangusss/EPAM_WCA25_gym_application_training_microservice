@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -30,49 +31,94 @@ public class TrainerWorkloadServiceImpl implements TrainerWorkloadService {
 
     @Override
     public void obtainWorkload(TrainerWorkloadDTO.Request.Create request, String transactionId) {
+        log.info("[{}][Transaction] Processing training event for trainer: {}, action: {}",
+                transactionId, request.username(), request.actionType());
+
         YearMonth period = YearMonth.from(request.trainingDate());
+        log.debug("[{}][Operation] Calculated period {} for training date {}",
+                transactionId, period, request.trainingDate());
 
         switch (request.actionType()) {
             case ADD -> addTrainingHours(request, period, transactionId);
             case DELETE -> deleteTrainingHours(request.username(), period, request.trainingDuration(), transactionId);
         }
+
+        log.info("[{}][Transaction] Completed processing training event for trainer: {}",
+                transactionId, request.username());
     }
 
     @Override
     @Transactional(readOnly = true)
     public TrainerWorkloadDTO.Response.Summary getTrainerSummary(String username, String transactionId) {
+        log.info("[{}][Transaction] Retrieving workload summary for trainer {}", transactionId, username);
+
         List<TrainerWorkload> workloads = repository.findByUsername(username);
+        log.debug("[{}][Operation] Found {} workload records for trainer {}",
+                transactionId, workloads.size(), username);
 
         if (workloads.isEmpty()) {
             log.warn("[{}] Workload not found for trainer {}", transactionId, username);
             throw new TrainerNotFoundException(username);
         }
 
-        return mapper.toSummary(workloads);
+        TrainerWorkloadDTO.Response.Summary summary = mapper.toSummary(workloads);
+        log.info("[{}][Transaction] Successfully retrieved summary for trainer: {}", transactionId, username);
+
+        return summary;
     }
 
     private void addTrainingHours(TrainerWorkloadDTO.Request.Create request, YearMonth period, String transactionId) {
-        boolean isNew = !repository.existsByUsernameAndPeriod(request.username(), period);
+        log.debug("[{}][Operation] Searching for existing workload: username={}, period={}",
+                transactionId, request.username(), period);
 
-        TrainerWorkload workload = repository
-                .findByUsernameAndPeriod(request.username(), period)
-                .orElseGet(() -> mapper.toEntity(request, period));
+        Optional<TrainerWorkload> workloadOpt = repository.findByUsernameAndPeriod(request.username(), period);
 
-        double oldHours = workload.getTotalHours();
-
-        if (!isNew) {
-            workload.setTotalHours(oldHours + request.trainingDuration());
-            mapper.updateEntityFromRequest(workload, request);
+        if (workloadOpt.isEmpty()) {
+            log.debug("[{}][Operation] Creating new workload for trainer: {}, period: {}",
+                    transactionId, request.username(), period);
+            createNewWorkload(request, period, transactionId);
+        } else {
+            log.debug("[{}][Operation] Updating existing workload for trainer: {}, period: {}",
+                    transactionId, request.username(), period);
+            updateExistingWorkload(workloadOpt.get(), request, transactionId);
         }
+    }
+
+    private void createNewWorkload(TrainerWorkloadDTO.Request.Create request, YearMonth period, String transactionId) {
+        TrainerWorkload workload = mapper.toEntity(request, period);
+
+        log.debug("[{}][Operation] Saving new workload: username={}, period={}, totalHours={}",
+                transactionId, workload.getUsername(), workload.getPeriod(), workload.getTotalHours());
 
         repository.save(workload);
 
-        log.debug("[{}] Added {} hours for trainer {} in period {}. Total: {} -> {}",
-                transactionId, request.trainingDuration(), request.username(),
-                period, oldHours, workload.getTotalHours());
+        log.info("[{}][Operation] Created new workload for trainer: {}, totalHours: {}",
+                transactionId, request.username(), workload.getTotalHours());
+    }
+
+    private void updateExistingWorkload(TrainerWorkload workload, TrainerWorkloadDTO.Request.Create request, String transactionId) {
+        double oldHours = workload.getTotalHours();
+        double newHours = oldHours + request.trainingDuration();
+
+        log.debug("[{}][Operation] Updating trainer profile: firstName={}, lastName={}, status={}",
+                transactionId, request.firstName(), request.lastName(), request.status());
+
+        mapper.updateEntityFromRequest(workload, request);
+        workload.setTotalHours(newHours);
+
+        log.debug("[{}][Operation] Saving updated workload: totalHours: {} -> {}",
+                transactionId, oldHours, newHours);
+
+        repository.save(workload);
+
+        log.info("[{}][Operation] Updated workload for trainer: {}, added {} hours, new total: {}",
+                transactionId, request.username(), request.trainingDuration(), newHours);
     }
 
     private void deleteTrainingHours(String username, YearMonth period, Double trainingDuration, String transactionId) {
+        log.debug("[{}][Operation] Searching for workload to delete: username={}, period={}",
+                transactionId, username, period);
+
         TrainerWorkload workload = repository
                 .findByUsernameAndPeriod(username, period)
                 .orElseThrow(() -> {
@@ -85,14 +131,15 @@ public class TrainerWorkloadServiceImpl implements TrainerWorkloadService {
         double newHours = oldHours - trainingDuration;
 
         if (newHours <= 0) {
+            log.debug("[{}][Operation] Deleting workload: totalHours became {} (≤ 0)", transactionId, newHours);
             repository.delete(workload);
-            log.debug("[{}] Deleted workload for trainer {} in period {}. Total: {} -> 0",
-                    transactionId, username, period, oldHours);
+            log.info("[{}][Operation] Deleted workload for trainer: {}, period: {}", transactionId, username, period);
         } else {
             workload.setTotalHours(newHours);
+            log.debug("[{}][Operation] Saving updated workload: totalHours: {} -> {}", transactionId, oldHours, newHours);
             repository.save(workload);
-            log.debug("[{}] Removed {} hours for trainer {} in period {}. Total: {} -> {}",
-                    transactionId, trainingDuration, username, period, oldHours, newHours);
+            log.info("[{}][Operation] Removed {} hours for trainer: {}, new total: {}",
+                    transactionId, trainingDuration, username, newHours);
         }
     }
 }
