@@ -45,7 +45,6 @@ class TrainerWorkloadControllerTest {
     private TrainerWorkloadController controller;
 
     private MockMvc mockMvc;
-    private ObjectMapper objectMapper;
 
     private static final String USERNAME = "john.doe";
     private static final String FIRST_NAME = "John";
@@ -54,7 +53,7 @@ class TrainerWorkloadControllerTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
-        objectMapper = new ObjectMapper();
+        ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
     }
 
@@ -152,6 +151,107 @@ class TrainerWorkloadControllerTest {
                     .andExpect(jsonPath("$.lastName").value(LAST_NAME));
 
             verify(generatedDtoMapper).toGeneratedSummary(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("POST /api/v1/workload")
+    class ProcessTrainingTests {
+
+        @Test
+        @DisplayName("Should process training event and return 200 OK")
+        void shouldProcessTrainingEventAndReturnOk() throws Exception {
+            String requestJson = """
+                    {
+                        "username": "john.doe",
+                        "firstName": "John",
+                        "lastName": "Doe",
+                        "status": "ACTIVE",
+                        "trainingDate": "2025-01-15T00:00:00.000Z",
+                        "trainingDuration": 2.5,
+                        "actionType": "ADD"
+                    }
+                    """;
+
+            mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/workload")
+                            .contentType("application/json")
+                            .content(requestJson))
+                    .andExpect(status().isOk());
+
+            verify(generatedDtoMapper).toInternalCreate(any());
+            verify(service).obtainWorkload(any(), anyString());
+        }
+
+        @Test
+        @DisplayName("Should use custom transaction ID from header")
+        void shouldUseCustomTransactionIdFromHeader() throws Exception {
+            String customTransactionId = "test-txn-123";
+            String requestJson = """
+                    {
+                        "username": "john.doe",
+                        "firstName": "John",
+                        "lastName": "Doe",
+                        "status": "ACTIVE",
+                        "trainingDate": "2025-01-15T00:00:00.000Z",
+                        "trainingDuration": 2.5,
+                        "actionType": "ADD"
+                    }
+                    """;
+
+            mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/workload")
+                            .header("X-Transaction-Id", customTransactionId)
+                            .contentType("application/json")
+                            .content(requestJson))
+                    .andExpect(status().isOk());
+
+            verify(service).obtainWorkload(any(), eq(customTransactionId));
+        }
+
+        @Test
+        @DisplayName("Should process DELETE action type")
+        void shouldProcessDeleteActionType() throws Exception {
+            String requestJson = """
+                    {
+                        "username": "john.doe",
+                        "firstName": "John",
+                        "lastName": "Doe",
+                        "status": "ACTIVE",
+                        "trainingDate": "2025-01-15T00:00:00.000Z",
+                        "trainingDuration": 2.5,
+                        "actionType": "DELETE"
+                    }
+                    """;
+
+            mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/workload")
+                            .contentType("application/json")
+                            .content(requestJson))
+                    .andExpect(status().isOk());
+
+            verify(generatedDtoMapper).toInternalCreate(any());
+            verify(service).obtainWorkload(any(), anyString());
+        }
+
+        @Test
+        @DisplayName("Should handle INACTIVE status")
+        void shouldHandleInactiveStatus() throws Exception {
+            String requestJson = """
+                    {
+                        "username": "john.doe",
+                        "firstName": "John",
+                        "lastName": "Doe",
+                        "status": "INACTIVE",
+                        "trainingDate": "2025-01-15T00:00:00.000Z",
+                        "trainingDuration": 2.5,
+                        "actionType": "ADD"
+                    }
+                    """;
+
+            mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1/workload")
+                            .contentType("application/json")
+                            .content(requestJson))
+                    .andExpect(status().isOk());
+
+            verify(service).obtainWorkload(any(), anyString());
         }
     }
 }
