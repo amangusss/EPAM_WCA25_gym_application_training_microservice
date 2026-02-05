@@ -204,7 +204,6 @@ class TrainerWorkloadServiceImplTest {
 
             verify(repository).save(workloadCaptor.capture());
             TrainerWorkload saved = workloadCaptor.getValue();
-            // Проверяем что список годов пустой или первый год не имеет месяцев
             assertThat(saved.getYears()).satisfiesAnyOf(
                     years -> assertThat(years).isEmpty(),
                     years -> assertThat(years.get(0).getMonths()).isEmpty()
